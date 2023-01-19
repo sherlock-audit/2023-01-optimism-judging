@@ -1,0 +1,42 @@
+name: validate-judging-repo
+run-name: validate-judging-repo
+on:
+  push:
+    branches:
+      - "main"
+  workflow_dispatch:
+jobs:
+  validate-changes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+      - uses: jitterbit/get-changed-files@v1
+        id: changes
+        with:
+          format: space-delimited
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.8"
+      - name: Validate changes
+        run: >
+          ADDED_FILES="${{ steps.changes.outputs.added }}"
+          MODIFIED_FILES="${{ steps.changes.outputs.modified }}"
+          RENAMED_FILES="${{ steps.changes.outputs.renamed }}"
+          REMOVED_FILES="${{ steps.changes.outputs.removed }}"
+          python .data/validate_changes.py
+  validate-filesystem:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.8"
+      - name: Validate filesystem structure
+        run: >
+          TOTAL_ISSUES="${{ secrets.TOTAL_ISSUES }}"
+          python .data/validate_filesystem.py

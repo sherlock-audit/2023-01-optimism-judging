@@ -1,0 +1,19 @@
+name: sync-files-to-issues
+run-name: sync-files-to-issues
+on:
+  workflow_dispatch:
+permissions: write-all
+jobs:
+  sync-issues:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.8"
+      - name: Setup Python dependencies
+        run: pip install PyGithub==1.55
+      - name: Sync the issues
+        run: GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} GITHUB_REPOSITORY=$GITHUB_REPOSITORY GITHUB_RUN_NUMBER=$GITHUB_RUN_NUMBER python .data/sync_issues.py
