@@ -1,5 +1,6 @@
 import datetime
 import os
+import re
 import time
 from functools import lru_cache, wraps
 
@@ -24,9 +25,9 @@ def github_retry_on_rate_limit(func):
             except RateLimitExceededException:
                 print("Rate Limit hit.")
                 rl = github.get_rate_limit()
-                time_to_sleep = int((
-                    rl.core.reset - datetime.datetime.utcnow()
-                ).total_seconds() + 1)
+                time_to_sleep = int(
+                    (rl.core.reset - datetime.datetime.utcnow()).total_seconds() + 1
+                )
                 print("Sleeping for %s seconds" % time_to_sleep)
                 time.sleep(time_to_sleep)
 
@@ -65,7 +66,7 @@ class RepositoryExtended(Repository.Repository):
 #   "parent": 5,  # corresponds to the issue 005 => issue is duplicate of 005
 #   "closed": True,  # True for a closed, unlabeled or low/info issue
 #   "auditor": "rcstanciu",
-#   "severity": "H",  # or None if the issue is unlabeled, closed or low/info
+#   "severity": "H",  # Possible values: "H", "M" or "false"
 #   "title": "Issue title",
 #   "body": "Issue body",
 #   "has_duplicates": True,
@@ -83,16 +84,14 @@ def process_directory(repo, path):
     ]
     for item in repo_items:
         print("Reading file %s" % item.name)
-        if item.name in ["low", "false"]:
-            process_directory(repo, item.path)
-            continue
 
         parent = None
-        closed = any(x in path for x in ["low", "false"])
+        closed = True  # Root issues are closed by default
         files = []
         dir_issues_ids = []
-        severity = None
+        severity = "false"
         if item.type == "dir":
+            closed = any(x in item.name for x in ["low", "false"])
             # If it's a directory, we have some duplicate issues
             files = list(repo.get_contents(item.path))
             try:
@@ -113,9 +112,8 @@ def process_directory(repo, path):
 
             body = file.decoded_content.decode("utf-8")
             auditor = body.split("\n")[0]
-            title = auditor + " - " + body.split("\n")[4].split("# ")[1]
-            if not severity:
-                severity = body.split("\n")[2][0].upper()
+            issue_title = re.match(r"^(?:[#\s]+)(.*)$", body.split("\n")[4]).group(1)
+            title = f"{auditor} - {issue_title}"
 
             # Stop the script if an issue is found multiple times in the filesystem
             if issue_id in issues.keys():
@@ -134,7 +132,7 @@ def process_directory(repo, path):
             dir_issues_ids.append(issue_id)
 
         # Set the parent field for all duplicates in this directory
-        if len(files) > 1 and parent is None:
+        if len(files) > 1 and parent is None and severity != "false":
             raise Exception(
                 "Issue %s does not have a primary file (-best.md)." % item.path
             )
@@ -231,6 +229,11 @@ def main():
             "description": "The sponsor confirmed this issue will be fixed",
         },
         {
+            "name": "Won't Fix",
+            "color": "957B63",
+            "description": "The sponsor confirmed this issue will not be fixed",
+        },
+        {
             "name": "Escalated",
             "color": "FEF2C0",
             "description": "This issue contains a pending escalation",
@@ -288,6 +291,8 @@ def main():
                 issue_labels.append("High")
             elif issue["severity"] == "M":
                 issue_labels.append("Medium")
+            elif issue["severity"] == "L":
+                issue_labels.append("Low/Info")
 
         if issue["closed"] and not issue["parent"]:
             issue_labels.append("Excluded")
