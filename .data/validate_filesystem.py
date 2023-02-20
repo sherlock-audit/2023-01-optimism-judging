@@ -31,7 +31,7 @@ def main():
             is_dir = os.path.isdir(item)
 
             if is_dir:
-                if not re.match(r"^\d+-([HM])?$|^low$|^false$", item):
+                if not re.match(r"^\d+-([HML])?$|^low$|^false$", item):
                     errors.append("Directory %s is not formatted properly." % item)
 
                 process_directory(os.path.join(path, item))
